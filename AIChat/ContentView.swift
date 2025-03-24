@@ -8,14 +8,33 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var chatStore = ChatStore()
+    @State private var selectedTab = 0
+    @State private var selectedChatRecord: ChatRecord?
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        TabView(selection: $selectedTab) {
+            ChatView(
+                chatRecord: $selectedChatRecord,
+                onStartNewChat: {
+                    selectedChatRecord = nil
+                }
+            )
+            .tabItem {
+                Label("聊天", systemImage: "message.fill")
+            }
+            .tag(0)
+            
+            ChatListView(onSelectChatRecord: { record in
+                selectedChatRecord = record
+                selectedTab = 0
+            })
+                .tabItem {
+                    Label("记录", systemImage: "list.bullet")
+                }
+                .tag(1)
         }
-        .padding()
+        .environmentObject(chatStore)
     }
 }
 
