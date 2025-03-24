@@ -68,20 +68,13 @@ struct ChatView: View {
                         // 添加加载指示器
                         if isLoading {
                             HStack(alignment: .center) {
-                                Spacer()
-                                VStack(spacing: 8) {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle())
-                                        .scaleEffect(1.2)
-                                    
-                                    Text("DeepSeek 正在思考...")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .background(Color(UIColor.systemGray6).opacity(0.7))
-                                .cornerRadius(12)
-                                Spacer()
+                                Image(systemName: "leaf.fill")
+                                    .foregroundColor(.green)
+                                    .padding(8)
+                                    .background(Color(UIColor.systemGray6))
+                                    .clipShape(Circle())
+                                
+                                LoadingBubbleView()
                             }
                             .id("loadingIndicator")
                             .padding(.top, 16)
