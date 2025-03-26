@@ -8,6 +8,7 @@ struct ChatView: View {
     @State private var showLoginSheet = false
     @State private var isLoggedIn = false
     @State private var remainingChats = 3
+    @State private var userEmail: String?
     @EnvironmentObject var chatStore: ChatStore
     @Binding var chatRecord: ChatRecord?
     var onStartNewChat: (() -> Void)?
@@ -54,6 +55,8 @@ struct ChatView: View {
                 }) {
                     HStack {
                         if isLoggedIn {
+                            Text(userEmail ?? "")
+                                .foregroundColor(.blue)
                             Image(systemName: "person.circle.fill")
                                 .foregroundColor(.blue)
                         } else {
@@ -193,6 +196,14 @@ struct ChatView: View {
             // 每次视图出现时，确保从chatRecord加载消息
             if let record = chatRecord, messages.isEmpty {
                 messages = record.messages
+            }
+            
+            // 检查登录状态
+            if let token = UserDefaults.standard.string(forKey: "userToken"),
+               let email = UserDefaults.standard.string(forKey: "userEmail") {
+                isLoggedIn = true
+                userEmail = email
+                remainingChats = Int.max // 登录用户无限制
             }
         }
         .onChange(of: chatRecord?.id) { _ in
