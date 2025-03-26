@@ -13,6 +13,7 @@ struct ChatView: View {
     @Binding var chatRecord: ChatRecord?
     var onStartNewChat: (() -> Void)?
     var onUpdateChatRecord: ((ChatRecord) -> Void)?
+    @State private var showProfileSheet = false
     
     private let chatService = ChatService()
     
@@ -51,7 +52,11 @@ struct ChatView: View {
                 
                 // 只保留登录按钮
                 Button(action: {
-                    showLoginSheet = true
+                    if isLoggedIn {
+                        showProfileSheet = true
+                    } else {
+                        showLoginSheet = true
+                    }
                 }) {
                     HStack {
                         if isLoggedIn {
@@ -214,7 +219,32 @@ struct ChatView: View {
             }
         }
         .sheet(isPresented: $showLoginSheet) {
-            LoginView()
+            LoginView(onLoginSuccess: {
+                // 登录成功后立即更新状态
+                if let token = UserDefaults.standard.string(forKey: "userToken"),
+                   let email = UserDefaults.standard.string(forKey: "userEmail") {
+                    isLoggedIn = true
+                    userEmail = email
+                    remainingChats = Int.max // 登录用户无限制
+                }
+            })
+            .environmentObject(chatStore)
+        }
+        .sheet(isPresented: $showProfileSheet) {
+            UserProfileView(
+                email: userEmail ?? "",
+                onLogout: {
+                    // 退出登录时清除用户信息
+                    UserDefaults.standard.removeObject(forKey: "userToken")
+                    UserDefaults.standard.removeObject(forKey: "userEmail")
+                    UserDefaults.standard.removeObject(forKey: "userId")
+                    isLoggedIn = false
+                    userEmail = nil
+                    // 如果是未登录用户，限制对话次数
+                    remainingChats = 5
+                }
+            )
+            .environmentObject(chatStore)
         }
     }
     
