@@ -5,6 +5,9 @@ struct ChatView: View {
     @State private var messages: [Message] = []
     @State private var isLoading = false
     @State private var isDeepThinking = true  // 默认选中状态
+    @State private var showLoginSheet = false
+    @State private var isLoggedIn = false
+    @State private var remainingChats = 3
     @EnvironmentObject var chatStore: ChatStore
     @Binding var chatRecord: ChatRecord?
     var onStartNewChat: (() -> Void)?
@@ -44,13 +47,20 @@ struct ChatView: View {
                     .font(.title2)
                     .bold()
                 Spacer()
+                
+                // 只保留登录按钮
                 Button(action: {
-                    // 新增聊天功能
-                    messages = []  // 清空当前消息
-                    onStartNewChat?()  // 调用回调函数
+                    showLoginSheet = true
                 }) {
-                    Image(systemName: "square.and.pencil")  // 修改图标为新增聊天
-                        .foregroundColor(.primary)
+                    HStack {
+                        if isLoggedIn {
+                            Image(systemName: "person.circle.fill")
+                                .foregroundColor(.blue)
+                        } else {
+                            Text("登录")
+                                .foregroundColor(.blue)
+                        }
+                    }
                 }
             }
             .padding()
@@ -111,7 +121,17 @@ struct ChatView: View {
             
             // 输入区域
             VStack(spacing: 8) {
-                // 使用完全不同的实现方式 - 显示两个不同的按钮
+                if !isLoggedIn {
+                    HStack {
+                        Text("剩余对话次数：\(remainingChats)")
+                            .foregroundColor(.gray)
+                            .font(.subheadline)
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                }
+                
+                // 深度思考按钮
                 HStack {
                     Spacer()
                     Button(action: {
@@ -119,7 +139,7 @@ struct ChatView: View {
                         print("深度思考模式: \(isDeepThinking ? "开启" : "关闭")")
                     }) {
                         HStack {
-                            Image(systemName: "brain") // 始终使用同一个图标
+                            Image(systemName: "brain")
                             Text("深度思考")
                         }
                         .padding(.horizontal, 12)
@@ -131,6 +151,7 @@ struct ChatView: View {
                     Spacer()
                 }
                 
+                // 输入框和发送按钮
                 HStack(spacing: 8) {
                     TextField("有问题，尽管问", text: $messageText)
                         .padding(10)
@@ -147,6 +168,23 @@ struct ChatView: View {
                     }
                     .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
                 }
+                
+                // 新增对话按钮移到底部
+                Button(action: {
+                    messages = []
+                    onStartNewChat?()
+                }) {
+                    HStack {
+                        Image(systemName: "square.and.pencil")
+                        Text("新对话")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.blue.opacity(0.1))
+                    .foregroundColor(.blue)
+                    .cornerRadius(10)
+                }
+                .padding(.top, 8)
             }
             .padding()
             .background(Color(UIColor.systemBackground))
@@ -164,16 +202,31 @@ struct ChatView: View {
                 messages = []
             }
         }
+        .sheet(isPresented: $showLoginSheet) {
+            LoginView()
+        }
     }
     
     private func sendMessage() {
         let userMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !userMessage.isEmpty else { return }
         
+        // 检查未登录用户的对话次数
+        if !isLoggedIn && remainingChats <= 0 {
+            let errorMessage = Message(content: "您已达到未登录用户的对话次数限制，请登录后继续使用", isUser: false, timestamp: Date())
+            messages.append(errorMessage)
+            return
+        }
+        
         // 添加用户消息
         let userMessageObj = Message(content: userMessage, isUser: true, timestamp: Date())
         messages.append(userMessageObj)
         messageText = ""
+        
+        // 如果是未登录用户，减少剩余对话次数
+        if !isLoggedIn {
+            remainingChats -= 1
+        }
         
         isLoading = true
         
@@ -188,30 +241,30 @@ struct ChatView: View {
                 
                 switch result {
                 case .success(let response):
-                    // 创建包含思考内容的消息
                     let aiMessage = Message(
-                        content: response.content,             // 使用 response.content 而不是整个 response
-                        reasoningContent: response.reasoningContent,  // 添加思考内容
+                        content: response.content,
+                        reasoningContent: response.reasoningContent,
                         isUser: false,
                         timestamp: Date()
                     )
                     messages.append(aiMessage)
                     
-                    // 保存或更新聊天记录
+                    // 修改保存聊天记录的逻辑
                     if let record = chatRecord {
                         // 更新现有聊天记录
                         let updatedRecord = ChatRecord(
                             id: record.id,
                             title: record.title,
-                            lastMessage: response.content,     // 使用 response.content
+                            lastMessage: response.content,
                             timestamp: Date(),
                             messages: messages
                         )
                         chatStore.updateChatRecord(updatedRecord)
                         onUpdateChatRecord?(updatedRecord)
-                    } else {
-                        // 只有在没有聊天记录时才创建新记录
+                    } else if messages.count >= 2 {  // 只在有对话内容时创建新记录
+                        // 创建新记录并更新绑定
                         let newRecord = chatStore.addChatRecord(messages)
+                        chatRecord = newRecord  // 更新绑定，防止重复创建
                         onUpdateChatRecord?(newRecord)
                     }
                     
